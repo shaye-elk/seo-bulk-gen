@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SEO Gap Filler</title>
+<title>Batch SEO Tool</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@700;800;900&family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -126,7 +126,7 @@ body::before {
 .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 
 /* Domain input */
-.domain-wrap { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; }
+.domain-wrap { display: flex; gap: 10px; align-items: center; margin-bottom: 4px; }
 .domain-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 9px 12px; font-size: 13px; font-family: var(--mono); outline: none; }
 .domain-input:focus { border-color: var(--accent); }
 .domain-label { font-size: 11px; font-family: var(--mono); color: var(--accent); white-space: nowrap; }
@@ -146,15 +146,26 @@ body::before {
 /* Modal */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(4px); }
 .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px; width: 100%; max-width: 680px; }
-.modal h2 { font-family: var(--display); font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+.modal h2 { font-family: var(--body); font-size: 18px; font-weight: 700; margin-bottom: 6px; }
 .modal p { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.6; }
 .modal textarea { width: 100%; height: 260px; background: #0a0b0e; border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 12px; font-family: var(--mono); font-size: 10.5px; resize: none; outline: none; }
+
+/* Dev mode toggle */
+.dev-toggle { position: fixed; bottom: 16px; right: 16px; z-index: 900; display: flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-family: var(--mono); font-size: 11px; color: var(--muted); cursor: pointer; transition: all 0.2s; }
+.dev-toggle:hover { border-color: var(--accent); }
+.dev-toggle.active { border-color: var(--warn); color: var(--warn); background: rgba(245,166,35,0.08); }
+.dev-toggle .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background 0.2s; }
+.dev-toggle.active .dot { background: var(--warn); }
 
 /* Section visibility */
 .section { display: none; }
 .section.visible { display: block; }
 
 /* Detected badge */
+/* Tooltip */
+.site-name-tip:hover + .tip-box { display: block; }
+.tip-box { display: none; position: absolute; left: 0; top: 100%; margin-top: 6px; width: 320px; padding: 10px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; font-size: 11px; font-family: var(--mono); color: var(--muted); line-height: 1.5; z-index: 10; }
+
 .detected { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(61,220,151,0.1); border: 1px solid rgba(61,220,151,0.3); border-radius: 999px; font-family: var(--mono); font-size: 11px; color: var(--accent2); margin-bottom: 14px; }
 </style>
 </head>
@@ -162,9 +173,9 @@ body::before {
 <div class="wrap">
 
   <div class="hdr">
-    <div class="hdr-tag">Universal SEO Tool</div>
+    <div class="hdr-tag">Batch SEO Tool</div>
     <h1>SEO <span>Gap Filler</span></h1>
-    <p>Upload any CSV — Screaming Frog, BigCommerce, Shopify, or custom. Automatically finds missing titles & descriptions and fills them with AI.</p>
+    <p>Upload any CSV — Screaming Frog, Shopify, BigCommerce, or custom. Automatically finds missing SEO and fills them with AI.</p>
   </div>
 
   <div class="steps">
@@ -177,7 +188,7 @@ body::before {
   <!-- STEP 1: Upload -->
   <div class="card section visible" id="sec-upload">
     <div class="card-title">Upload your CSV</div>
-    <div class="card-sub">Drag & drop or click to browse. Supports Screaming Frog, BigCommerce, Shopify and custom exports.</div>
+    <div class="card-sub">Drag & drop or click to browse. Supports Screaming Frog, Shopify, BigCommerce and custom exports.</div>
     <div class="upload-zone" id="drop-zone">
       <input type="file" id="file-input" accept=".csv" />
       <div class="upload-icon">📂</div>
@@ -185,8 +196,9 @@ body::before {
       <p>or click to browse files</p>
       <div class="fmt">
         <span class="fmt-tag">Screaming Frog</span>
-        <span class="fmt-tag">BigCommerce</span>
         <span class="fmt-tag">Shopify</span>
+        <span class="fmt-tag">BigCommerce</span>
+        <span class="fmt-tag">WooCommerce</span>
         <span class="fmt-tag">Custom CSV</span>
       </div>
     </div>
@@ -198,8 +210,12 @@ body::before {
     <div class="card-sub">We auto-detected your format — review or adjust the column assignments below.</div>
     <div id="detected-badge"></div>
     <div class="domain-wrap">
-      <span class="domain-label">SITE NAME / BRAND →</span>
-      <input type="text" class="domain-input" id="site-name" placeholder="e.g. RJ Nautical, Acme Store..." />
+      <span class="domain-label">SITE NAME (Appended to SEO Title) →</span>
+      <input type="text" class="domain-input" id="site-name" placeholder="e.g. Acme Corp — becomes (SEO Title) - Acme Corp" />
+    </div>
+    <div style="font-size: 11px; font-family: var(--mono); color: var(--muted); margin-bottom: 14px; position: relative; display: inline-block;">
+      <span style="color: var(--warn);">IMPORTANT:</span> <span class="site-name-tip" style="text-decoration: underline; cursor: help;">SITE NAME</span>
+      <div class="tip-box">Usually unnecessary. Platforms like Shopify auto-add site names, so filling this may cause duplicates. Check your CSV first to verify.</div>
     </div>
     <div class="col-grid" id="col-grid">
       <!-- Populated by JS -->
@@ -227,6 +243,17 @@ body::before {
       <div class="prog-label" id="prog-label">Waiting to start…</div>
     </div>
 
+    <div class="col-field" style="margin-bottom: 12px; max-width: 280px;">
+      <label>EXPORT FORMAT</label>
+      <select id="export-platform">
+        <option value="shopify">Shopify</option>
+        <option value="bigcommerce">BigCommerce</option>
+        <option value="woocommerce">WooCommerce (Yoast SEO)</option>
+        <option value="raw">Raw CSV (URL + Title + Description)</option>
+      </select>
+      <div class="hint">Choose your platform — export will match its import format</div>
+    </div>
+
     <div class="btn-row">
       <button class="btn btn-primary" id="start-btn" onclick="startProcessing()">▶ Start Processing</button>
       <button class="btn btn-green" id="export-btn" onclick="showExport()" disabled>Export CSV</button>
@@ -250,6 +277,12 @@ body::before {
 
 </div>
 
+<!-- Dev Mode Toggle -->
+<div class="dev-toggle" id="dev-toggle" onclick="toggleDevMode()">
+  <div class="dot"></div>
+  <span>DEV MODE</span>
+</div>
+
 <!-- Export Modal -->
 <div class="modal-overlay" id="export-modal" style="display:none">
   <div class="modal">
@@ -266,6 +299,7 @@ body::before {
 
 <script>
 // ─── State ──────────────────────────────────────────────────────────────────
+let devMode = true;    // dev mode: mock AI responses (no API key needed)
 let rawRows = [];      // all parsed CSV rows
 let headers = [];
 let mapping = {};      // field -> column name
@@ -284,13 +318,28 @@ const FIELD_PATTERNS = {
   category:    [/^category$/i, /^categories$/i, /^type$/i, /^content type$/i],
   brand:       [/^brand/i, /^vendor$/i, /^manufacturer$/i],
   status:      [/^status code$/i, /^status$/i, /^response code$/i],
+  indexability: [/^indexability$/i],
+  indexability_status: [/^indexability status$/i],
 };
 
 const FORMAT_SIGNATURES = {
   'Screaming Frog': ['Address', 'Status Code', 'Title 1', 'Meta Description 1'],
-  'BigCommerce':    ['Product ID', 'Product Name', 'Page Title', 'Meta Description'],
   'Shopify':        ['Handle', 'Title', 'Body (HTML)', 'Vendor'],
+  'BigCommerce':    ['Product Name', 'Page Title', 'Meta Description'],
+  'WooCommerce':    ['ID', 'SKU', 'Name', 'Published'],
 };
+
+// BigCommerce has varied exports — also check for these combos
+function detectFormat(hdrs) {
+  for (const [fmt, sig] of Object.entries(FORMAT_SIGNATURES)) {
+    if (sig.every(s => hdrs.some(h => h.toLowerCase() === s.toLowerCase()))) return fmt;
+  }
+  // Extra BigCommerce detection: Item Type or Product Code/SKU with Page Title
+  const lhdrs = hdrs.map(h => h.toLowerCase());
+  if (lhdrs.includes('item type') && lhdrs.includes('page title')) return 'BigCommerce';
+  if (lhdrs.includes('product code/sku') && lhdrs.includes('page title')) return 'BigCommerce';
+  return 'Custom';
+}
 
 // ─── CSV Parser ──────────────────────────────────────────────────────────────
 function parseCSV(text) {
@@ -313,14 +362,6 @@ function parseCSV(text) {
   }
   if (cell || cells.length) { cells.push(cell); if (cells.some(x => x.trim())) rows.push(cells); }
   return rows;
-}
-
-// ─── Auto-detect format ───────────────────────────────────────────────────────
-function detectFormat(hdrs) {
-  for (const [fmt, sig] of Object.entries(FORMAT_SIGNATURES)) {
-    if (sig.every(s => hdrs.some(h => h.toLowerCase() === s.toLowerCase()))) return fmt;
-  }
-  return 'Custom';
 }
 
 function autoMap(hdrs) {
@@ -403,6 +444,44 @@ function confirmMapping() {
   ['url','name','current_title','current_desc','content','brand','category','status'].forEach(k => {
     mapping[k] = document.getElementById('map-' + k)?.value || '';
   });
+  // Auto-map indexability columns (not user-facing, detected automatically)
+  for (const [field, patterns] of Object.entries(FIELD_PATTERNS)) {
+    if (field === 'indexability' || field === 'indexability_status') {
+      for (const h of headers) {
+        if (patterns.some(p => p.test(h))) { mapping[field] = h; break; }
+      }
+    }
+  }
+
+  let skippedNonIndexable = 0;
+  let skippedUtilityPages = 0;
+
+  // Utility/functional page detection — matches URL paths that are not SEO-relevant
+  // Instead of a rigid blocklist, this uses broad path-segment patterns
+  const UTILITY_PATH_PATTERNS = [
+    // Auth & account
+    /\/(login|log-in|signin|sign-in|signup|sign-up|register|logout|log-out|forgot|reset-password|auth|oauth|sso|verify|activate|confirm)\b/i,
+    // Legal & policy
+    /\/(privacy|cookie|cookies|terms|tos|gdpr|legal|disclaimer|acceptable-use|data-protection|compliance)\b/i,
+    // Cart & checkout
+    /\/(cart|checkout|basket|order-confirmation|thank-you|thankyou|payment|billing)\b/i,
+    // Account/app areas
+    /\/(account|my-account|profile|dashboard|app|portal|settings|preferences|wishlist|favorites|subscriptions)\b/i,
+    // System/utility
+    /\/(admin|wp-admin|wp-login|cgi-bin|api|xmlrpc|feed|rss|sitemap|robots\.txt|\.well-known|healthcheck|status)\b/i,
+    // Common non-content file extensions in URLs
+    /\.(xml|json|txt|rss|atom)(\?|$)/i,
+    // Search & filter pages (duplicate content traps)
+    /\/(search|404|error|not-found|unsubscribe|opt-out)\b/i,
+  ];
+
+  function isUtilityPage(url) {
+    if (!url) return false;
+    try {
+      const path = new URL(url, 'https://placeholder.com').pathname.toLowerCase();
+      return UTILITY_PATH_PATTERNS.some(p => p.test(path));
+    } catch { return false; }
+  }
 
   // Filter rows needing update
   needsUpdate = rawRows.filter((row, idx) => {
@@ -412,19 +491,42 @@ function confirmMapping() {
       const code = parseInt(row[mapping.status]);
       if (code && (code < 200 || code >= 300)) return false;
     }
+    // Skip non-indexable pages (Screaming Frog: robots.txt blocked, noindex, etc.)
+    if (mapping.indexability && row[mapping.indexability]) {
+      if (row[mapping.indexability].toLowerCase() !== 'indexable') { skippedNonIndexable++; return false; }
+    }
+    if (mapping.indexability_status && row[mapping.indexability_status]) {
+      const status = row[mapping.indexability_status].toLowerCase();
+      if (status.includes('blocked') || status.includes('noindex') || status.includes('canonicalised')) { skippedNonIndexable++; return false; }
+    }
     // Skip if content type is not HTML (Screaming Frog)
     if (mapping.category && row[mapping.category]) {
       const ct = row[mapping.category].toLowerCase();
       if (ct.includes('redirect') || ct.includes('css') || ct.includes('javascript') || ct.includes('image')) return false;
     }
+    // Skip utility/functional pages by URL pattern
+    if (mapping.url && isUtilityPage(row[mapping.url])) { skippedUtilityPages++; return false; }
     const hasTitle = mapping.current_title && row[mapping.current_title] && row[mapping.current_title].length > 10;
     const hasDesc  = mapping.current_desc  && row[mapping.current_desc]  && row[mapping.current_desc].length > 30;
     return !hasTitle || !hasDesc;
   });
 
+  if (skippedNonIndexable > 0) {
+    log(`Excluded ${skippedNonIndexable} non-indexable pages (robots.txt blocked, noindex, etc.)`, 'warn');
+  }
+  if (skippedUtilityPages > 0) {
+    log(`Excluded ${skippedUtilityPages} utility pages (login, policy, cart, account, etc.)`, 'warn');
+  }
+
   show('sec-generate');
   hide('sec-mapping');
   setStep(3);
+
+  // Auto-set export format if we know the source isn't already the target platform
+  const platformMap = { 'Shopify': 'shopify', 'BigCommerce': 'bigcommerce', 'WooCommerce': 'woocommerce' };
+  if (platformMap[detectedFormat]) {
+    document.getElementById('export-platform').value = platformMap[detectedFormat];
+  }
 
   document.getElementById('s-total').textContent   = rawRows.length.toLocaleString();
   document.getElementById('s-missing').textContent = needsUpdate.length.toLocaleString();
@@ -485,7 +587,7 @@ async function startProcessing() {
         const name = (mapping.name && row[mapping.name]) || (mapping.url && row[mapping.url]) || 'Page';
         results[row._idx] = {
           id: row._idx,
-          title: name.slice(0,55) + ' | ' + siteName,
+          title: name.slice(0,55) + ' - ' + siteName,
           description: 'Visit ' + siteName + ' to learn more about ' + name.slice(0,80) + '.'
         };
       }
@@ -502,7 +604,47 @@ async function startProcessing() {
   setStep(4);
 }
 
+function toggleDevMode() {
+  devMode = !devMode;
+  const el = document.getElementById('dev-toggle');
+  el.classList.toggle('active', devMode);
+  log(devMode ? 'Dev mode ON — using mock AI responses' : 'Dev mode OFF — will call real API', 'info');
+}
+// Initialize toggle state on load
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('dev-toggle').classList.toggle('active', devMode);
+});
+
+function mockClaude(batch, siteName) {
+  return batch.map(row => {
+    const name     = (mapping.name     && row[mapping.name])     || 'Page';
+    const brand    = (mapping.brand    && row[mapping.brand])    || '';
+    const cat      = (mapping.category && row[mapping.category]) || '';
+    const curTitle = (mapping.current_title && row[mapping.current_title]) || '';
+    const curDesc  = (mapping.current_desc  && row[mapping.current_desc])  || '';
+
+    // Keep existing good content
+    const keepTitle = curTitle.length > 20;
+    const keepDesc  = curDesc.length > 50;
+
+    const cleanName = name.replace(/<[^>]*>/g, '').slice(0, 50);
+    const prefix = cat ? cat + ' - ' : '';
+    const suffix = brand ? ` by ${brand}` : '';
+
+    const title = keepTitle ? curTitle : `${prefix}${cleanName}${suffix} - ${siteName}`.slice(0, 63);
+    const description = keepDesc ? curDesc : `Discover ${cleanName}${suffix} at ${siteName}. Browse our selection and find the perfect fit for your needs. Shop now!`.slice(0, 158);
+
+    return { id: String(row._idx), title, description };
+  });
+}
+
 async function callClaude(batch, siteName) {
+  // Dev mode: return mock data with a small delay
+  if (devMode) {
+    await sleep(150 + Math.random() * 200);
+    return mockClaude(batch, siteName);
+  }
+
   const items = batch.map(row => {
     const url      = (mapping.url      && row[mapping.url])      || '';
     const name     = (mapping.name     && row[mapping.name])     || url;
@@ -517,7 +659,7 @@ async function callClaude(batch, siteName) {
   const prompt = `You are an SEO expert. Generate optimized Page Titles and Meta Descriptions for this website: "${siteName}".
 
 Rules:
-- Page Title: 50-65 characters. Include key terms + "| ${siteName}". Must be descriptive and unique.
+- Page Title: 50-65 characters. Include key terms + "- ${siteName}". Must be descriptive and unique.
 - Meta Description: 140-160 characters. Compelling, include a CTA, mention ${siteName}.
 - If CUR_TITLE is already good (>20 chars): keep it as the title. Only generate what's missing.
 - If CUR_DESC is already good (>50 chars): keep it as the description. Only generate what's missing.
@@ -573,26 +715,108 @@ function charBadge(len, min, max) {
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// ─── Platform Export Formats ──────────────────────────────────────────────────
+const PLATFORM_FORMATS = {
+  shopify: {
+    name: 'Shopify',
+    filename: 'shopify-seo-import.csv',
+    headers: ['Handle', 'Title', 'SEO Title', 'SEO Description'],
+    buildRow(row, r, finalTitle, finalDesc) {
+      const url = (mapping.url && row[mapping.url]) || '';
+      const handle = url.replace(/^https?:\/\/[^/]+\//,'').replace(/\/$/,'').split('/').pop() || '';
+      const name = (mapping.name && row[mapping.name]) || '';
+      return [handle, name, finalTitle, finalDesc];
+    }
+  },
+  bigcommerce: {
+    name: 'BigCommerce',
+    filename: 'bigcommerce-seo-import.csv',
+    headers: ['Product Name', 'Page Title', 'Meta Description'],
+    buildRow(row, r, finalTitle, finalDesc) {
+      const name = (mapping.name && row[mapping.name]) || '';
+      return [name, finalTitle, finalDesc];
+    }
+  },
+  woocommerce: {
+    name: 'WooCommerce',
+    filename: 'woocommerce-seo-import.csv',
+    headers: ['SKU', 'Name', 'Meta: _yoast_wpseo_title', 'Meta: _yoast_wpseo_metadesc'],
+    buildRow(row, r, finalTitle, finalDesc) {
+      const name = (mapping.name && row[mapping.name]) || '';
+      const url = (mapping.url && row[mapping.url]) || '';
+      // Try to extract SKU from URL or use empty
+      const sku = '';
+      return [sku, name, finalTitle, finalDesc];
+    }
+  },
+  raw: {
+    name: 'Raw CSV',
+    filename: 'seo-updated.csv',
+    headers: null, // dynamic
+    buildRow: null  // dynamic
+  }
+};
+
 // ─── Export ───────────────────────────────────────────────────────────────────
+function getDomainSlug() {
+  // Try to extract domain from first URL in the data
+  for (const row of rawRows) {
+    const url = (mapping.url && row[mapping.url]) || '';
+    if (url) {
+      try {
+        const hostname = new URL(url).hostname.replace(/^www\./, '');
+        // Strip TLD (.com, .net, .co.uk, etc.)
+        return hostname.replace(/\.[^.]+$/, '').replace(/\.[^.]+$/, '').replace(/[^a-z0-9]/gi, '-');
+      } catch(e) {}
+    }
+  }
+  // Fallback to site name input
+  const siteName = document.getElementById('site-name').value.trim();
+  if (siteName) return siteName.toLowerCase().replace(/[^a-z0-9]/gi, '-');
+  return 'site';
+}
+
+// Strip trailing site name segment from titles for platforms that auto-append it
+// e.g. "Marine Supply Store | Yamaha Support | RJ Nautical" → "Marine Supply Store | Yamaha Support"
+function stripTrailingSiteName(title) {
+  // Match trailing " | SiteName" or " - SiteName" (last segment)
+  return title.replace(/\s*[\|\-]\s*[^|\-]+$/, '').trim();
+}
+
 function showExport() {
-  // Build output CSV: updated rows only, with original columns + new title/desc
-  const titleCol = mapping.current_title || 'Page Title';
-  const descCol  = mapping.current_desc  || 'Meta Description';
-  const urlCol   = mapping.url || headers[0];
+  const platform = document.getElementById('export-platform').value;
+  const fmt = PLATFORM_FORMATS[platform];
+  const rows = [];
+  const shouldStrip = (platform !== 'raw'); // platforms auto-append site name
 
-  // Output columns: URL + Title + Description
-  const outHeaders = [urlCol, titleCol, descCol];
-  const rows = [outHeaders];
-
-  for (const row of needsUpdate) {
-    const r = results[row._idx];
-    if (!r) continue;
-    const url  = (mapping.url && row[mapping.url]) || '';
-    const existingTitle = (mapping.current_title && row[mapping.current_title]) || '';
-    const existingDesc  = (mapping.current_desc  && row[mapping.current_desc])  || '';
-    const finalTitle = existingTitle.length > 20 ? existingTitle : r.title;
-    const finalDesc  = existingDesc.length  > 50 ? existingDesc  : r.description;
-    rows.push([url, finalTitle, finalDesc]);
+  if (platform === 'raw') {
+    const titleCol = mapping.current_title || 'Page Title';
+    const descCol  = mapping.current_desc  || 'Meta Description';
+    const urlCol   = mapping.url || headers[0];
+    rows.push([urlCol, titleCol, descCol]);
+    for (const row of needsUpdate) {
+      const r = results[row._idx];
+      if (!r) continue;
+      const url = (mapping.url && row[mapping.url]) || '';
+      const existingTitle = (mapping.current_title && row[mapping.current_title]) || '';
+      const existingDesc  = (mapping.current_desc  && row[mapping.current_desc])  || '';
+      const finalTitle = existingTitle.length > 20 ? existingTitle : r.title;
+      const finalDesc  = existingDesc.length  > 50 ? existingDesc  : r.description;
+      rows.push([url, finalTitle, finalDesc]);
+    }
+  } else {
+    rows.push(fmt.headers);
+    for (const row of needsUpdate) {
+      const r = results[row._idx];
+      if (!r) continue;
+      const existingTitle = (mapping.current_title && row[mapping.current_title]) || '';
+      const existingDesc  = (mapping.current_desc  && row[mapping.current_desc])  || '';
+      let finalTitle = existingTitle.length > 20 ? existingTitle : r.title;
+      const finalDesc  = existingDesc.length  > 50 ? existingDesc  : r.description;
+      // Strip trailing site name for platforms that auto-append it
+      if (shouldStrip) finalTitle = stripTrailingSiteName(finalTitle);
+      rows.push(fmt.buildRow(row, r, finalTitle, finalDesc));
+    }
   }
 
   const csv = rows.map(row =>
@@ -600,16 +824,19 @@ function showExport() {
   ).join('\r\n');
 
   document.getElementById('csv-out').value = csv;
+  document.getElementById('export-modal').querySelector('h2').textContent = `Export Ready — ${fmt.name} Format`;
   document.getElementById('export-modal').style.display = 'flex';
 }
 
 function downloadCSV() {
+  const platform = document.getElementById('export-platform').value;
+  const slug = getDomainSlug();
   const csv = document.getElementById('csv-out').value;
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'seo-updated.csv';
+  a.download = `${slug}-optimized-seo.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
