@@ -1,33 +1,455 @@
-export default async function handler(req, res) {
-  // Only allow POST
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SEO Bulk Generator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'API key not configured' });
-  }
-
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
-        'x-api-key': apiKey,
-      },
-      body: JSON.stringify(req.body),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return res.status(response.status).json(data);
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f6fa;
+      color: #1a1a2e;
+      min-height: 100vh;
     }
 
-    return res.status(200).json(data);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header h1 { font-size: 1.3rem; font-weight: 600; letter-spacing: -0.3px; }
+    header span { font-size: 0.8rem; background: #4f46e5; padding: 2px 8px; border-radius: 12px; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 32px 20px; }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+
+    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 18px; color: #374151; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    label { display: block; font-size: 0.82rem; font-weight: 500; color: #6b7280; margin-bottom: 6px; }
+
+    select, input[type="text"], textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      color: #1a1a2e;
+      background: #fafafa;
+      transition: border-color 0.15s;
+      font-family: inherit;
+    }
+
+    select:focus, input:focus, textarea:focus {
+      outline: none;
+      border-color: #4f46e5;
+      background: #fff;
+    }
+
+    textarea { resize: vertical; min-height: 140px; line-height: 1.5; }
+
+    .hint { font-size: 0.75rem; color: #9ca3af; margin-top: 5px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-primary { background: #4f46e5; color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #4338ca; }
+
+    .btn-sm {
+      padding: 5px 12px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      border-radius: 6px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      cursor: pointer;
+      color: #374151;
+      transition: background 0.15s;
+    }
+
+    .btn-sm:hover { background: #f9fafb; }
+
+    .actions { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
+    .status { font-size: 0.82rem; color: #6b7280; }
+
+    /* Results */
+    #results-section { display: none; }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .results-header h2 { font-size: 1rem; font-weight: 600; color: #374151; }
+
+    .result-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+      background: #fafafa;
+    }
+
+    .result-keyword {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #4f46e5;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .result-content {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #1a1a2e;
+      white-space: pre-wrap;
+    }
+
+    .result-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .char-count { font-size: 0.75rem; color: #9ca3af; }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .progress-bar {
+      height: 4px;
+      background: #e5e7eb;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 10px;
+      display: none;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #4f46e5;
+      border-radius: 2px;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+
+    .error-msg {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-top: 12px;
+      display: none;
+    }
+
+    .copied { color: #16a34a !important; }
+
+    @media (max-width: 600px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>SEO Bulk Generator</h1>
+  <span>AI-Powered</span>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <h2>Configuration</h2>
+    <div class="grid-2">
+      <div>
+        <label for="content-type">Content Type</label>
+        <select id="content-type">
+          <option value="meta_title">Meta Title</option>
+          <option value="meta_description" selected>Meta Description</option>
+          <option value="h1">H1 Tag</option>
+          <option value="title_and_meta">Title + Meta Description</option>
+          <option value="blog_outline">Blog Post Outline</option>
+          <option value="blog_intro">Blog Introduction</option>
+          <option value="faq">FAQ Section</option>
+          <option value="product_description">Product Description</option>
+        </select>
+      </div>
+      <div>
+        <label for="tone">Tone</label>
+        <select id="tone">
+          <option value="professional">Professional</option>
+          <option value="friendly">Friendly</option>
+          <option value="persuasive">Persuasive</option>
+          <option value="informative">Informative</option>
+          <option value="authoritative">Authoritative</option>
+        </select>
+      </div>
+      <div>
+        <label for="target-audience">Target Audience (optional)</label>
+        <input type="text" id="target-audience" placeholder="e.g. small business owners, marketers" />
+      </div>
+      <div>
+        <label for="brand-name">Brand / Site Name (optional)</label>
+        <input type="text" id="brand-name" placeholder="e.g. Acme Corp" />
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Keywords</h2>
+    <label for="keywords">Enter one keyword or topic per line</label>
+    <textarea id="keywords" placeholder="best running shoes for women&#10;affordable home gym equipment&#10;how to start a podcast&#10;vegan protein powder"></textarea>
+    <p class="hint">Each line will generate a separate piece of content. Up to 20 keywords per batch.</p>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="generate-btn" onclick="generate()">
+        <div class="spinner" id="spinner"></div>
+        Generate
+      </button>
+      <span class="status" id="status-text"></span>
+    </div>
+
+    <div class="progress-bar" id="progress-bar">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+
+    <div class="error-msg" id="error-msg"></div>
+  </div>
+
+  <div id="results-section">
+    <div class="results-header">
+      <h2 id="results-title">Results</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-sm" onclick="copyAll()">Copy All</button>
+        <button class="btn-sm" onclick="downloadCSV()">Download CSV</button>
+        <button class="btn-sm" onclick="clearResults()">Clear</button>
+      </div>
+    </div>
+    <div id="results-list"></div>
+  </div>
+
+</div>
+
+<script>
+  const CONTENT_TYPE_PROMPTS = {
+    meta_title: (kw, tone, audience, brand) =>
+      `Write a single SEO meta title for the keyword: "${kw}". Tone: ${tone}.${audience ? ` Target audience: ${audience}.` : ''}${brand ? ` Brand: ${brand}.` : ''} Keep it under 60 characters. Return only the title, no explanation.`,
+
+    meta_description: (kw, tone, audience, brand) =>
+      `Write a single SEO meta description for the keyword: "${kw}". Tone: ${tone}.${audience ? ` Target audience: ${audience}.` : ''}${brand ? ` Include the brand name "${brand}".` : ''} Keep it between 140-160 characters. Include a clear call to action. Return only the description, no explanation.`,
+
+    h1: (kw, tone, audience, brand) =>
+      `Write a single compelling H1 tag for a webpage targeting the keyword: "${kw}". Tone: ${tone}.${audience ? ` Target audience: ${audience}.` : ''} Keep it under 70 characters. Return only the H1, no explanation.`,
+
+    title_and_meta: (kw, tone, audience, brand) =>
+      `Write an SEO meta title and meta description for the keyword: "${kw}". Tone: ${tone}.${audience ? ` Target audience: ${audience}.` : ''}${brand ? ` Brand: ${brand}.` : ''}\n\nFormat your response exactly as:\nTitle: [title under 60 chars]\nDescription: [description 140-160 chars with CTA]`,
+
+    blog_outline: (kw, tone, audience, brand) =>
+      `Write a detailed blog post outline targeting the keyword: "${kw}". Tone: ${tone}.${audience ? ` Target audience: ${audience}.` : ''} Include an H1, introduction note, 4-6 H2 sections with 2-3 bullet points each, and a conclusion. Return only the outline.`,
+
+    blog_intro: (kw, tone, audience, brand) =>
+      `Write an engaging blog post introduction (2-3 paragraphs) for an article about: "${kw}". Tone: ${tone}.${audience ? ` Target audience: ${audience}.` : ''} Hook the reader, establish relevance, and hint at what they'll learn. Return only the introduction.`,
+
+    faq: (kw, tone, audience, brand) =>
+      `Generate 5 FAQ questions and answers for the topic: "${kw}". Tone: ${tone}.${audience ? ` Target audience: ${audience}.` : ''} Format as Q: ... A: ... for each. Return only the FAQs.`,
+
+    product_description: (kw, tone, audience, brand) =>
+      `Write a compelling product description for: "${kw}". Tone: ${tone}.${audience ? ` Target audience: ${audience}.` : ''}${brand ? ` Brand: ${brand}.` : ''} Highlight key benefits, include a call to action. 2-3 short paragraphs. Return only the description.`,
+  };
+
+  let results = [];
+
+  async function generate() {
+    const keywords = document.getElementById('keywords').value
+      .split('\n')
+      .map(k => k.trim())
+      .filter(Boolean)
+      .slice(0, 20);
+
+    if (!keywords.length) {
+      showError('Please enter at least one keyword.');
+      return;
+    }
+
+    const contentType = document.getElementById('content-type').value;
+    const tone = document.getElementById('tone').value;
+    const audience = document.getElementById('target-audience').value.trim();
+    const brand = document.getElementById('brand-name').value.trim();
+
+    setLoading(true);
+    hideError();
+    results = [];
+    document.getElementById('results-list').innerHTML = '';
+    document.getElementById('results-section').style.display = 'none';
+
+    const bar = document.getElementById('progress-bar');
+    const fill = document.getElementById('progress-fill');
+    bar.style.display = 'block';
+    fill.style.width = '0%';
+
+    let completed = 0;
+
+    for (const kw of keywords) {
+      updateStatus(`Generating ${completed + 1} of ${keywords.length}…`);
+
+      try {
+        const prompt = CONTENT_TYPE_PROMPTS[contentType](kw, tone, audience, brand);
+
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-opus-4-6',
+            max_tokens: 1024,
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error?.message || `API error ${response.status}`);
+        }
+
+        const text = data.content?.[0]?.text ?? '';
+        results.push({ keyword: kw, content: text });
+        appendResult(kw, text);
+      } catch (err) {
+        results.push({ keyword: kw, content: `Error: ${err.message}` });
+        appendResult(kw, `Error: ${err.message}`, true);
+      }
+
+      completed++;
+      fill.style.width = `${(completed / keywords.length) * 100}%`;
+    }
+
+    setLoading(false);
+    bar.style.display = 'none';
+    updateStatus(`Done — ${completed} item${completed !== 1 ? 's' : ''} generated.`);
+
+    const label = document.getElementById('content-type').selectedOptions[0].text;
+    document.getElementById('results-title').textContent = `Results — ${label}`;
+    document.getElementById('results-section').style.display = 'block';
   }
-}
+
+  function appendResult(keyword, content, isError = false) {
+    const list = document.getElementById('results-list');
+    const div = document.createElement('div');
+    div.className = 'result-item';
+    if (isError) div.style.borderColor = '#fecaca';
+
+    div.innerHTML = `
+      <div class="result-keyword">${escapeHtml(keyword)}</div>
+      <div class="result-content">${escapeHtml(content)}</div>
+      <div class="result-footer">
+        <span class="char-count">${content.length} chars</span>
+        <button class="btn-sm copy-btn" onclick="copyOne(this, ${JSON.stringify(escapeHtml(content))})">Copy</button>
+      </div>
+    `;
+    list.appendChild(div);
+  }
+
+  function copyOne(btn, text) {
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+    });
+  }
+
+  function copyAll() {
+    const text = results.map(r => `${r.keyword}\n${r.content}`).join('\n\n---\n\n');
+    navigator.clipboard.writeText(text).then(() => alert('All results copied to clipboard!'));
+  }
+
+  function downloadCSV() {
+    if (!results.length) return;
+    const rows = [['Keyword', 'Generated Content']];
+    results.forEach(r => rows.push([r.keyword, r.content]));
+    const csv = rows.map(r => r.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'seo-content.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function clearResults() {
+    results = [];
+    document.getElementById('results-list').innerHTML = '';
+    document.getElementById('results-section').style.display = 'none';
+    updateStatus('');
+  }
+
+  function setLoading(on) {
+    const btn = document.getElementById('generate-btn');
+    const spinner = document.getElementById('spinner');
+    btn.disabled = on;
+    spinner.style.display = on ? 'block' : 'none';
+    btn.childNodes[btn.childNodes.length - 1].textContent = on ? ' Generating…' : ' Generate';
+  }
+
+  function updateStatus(msg) {
+    document.getElementById('status-text').textContent = msg;
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-msg');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function hideError() {
+    document.getElementById('error-msg').style.display = 'none';
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>
